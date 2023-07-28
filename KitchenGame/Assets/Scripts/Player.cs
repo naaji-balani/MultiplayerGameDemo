@@ -7,9 +7,14 @@ using UnityEngine;
 public class Player : NetworkBehaviour, IKitchenObjectParent {
 
 
-    //public static Player Instance { get; private set; }
+    public static event EventHandler onAnyPlayerSpawned;
+    public static event EventHandler onAnyPickedSomething;
+    public static Player LocalInstance { get; private set; }
 
-
+    public static void ResetStaticData()
+    {
+        onAnyPlayerSpawned = null;
+    }
 
     public event EventHandler OnPickedSomething;
     public event EventHandler<OnSelectedCounterChangedEventArgs> OnSelectedCounterChanged;
@@ -29,8 +34,10 @@ public class Player : NetworkBehaviour, IKitchenObjectParent {
     private KitchenObject kitchenObject;
 
 
-    private void Awake() {
-        //Instance = this;
+    public override void OnNetworkSpawn()
+    {
+        if (IsOwner) LocalInstance = this;
+        onAnyPlayerSpawned?.Invoke(this, EventArgs.Empty);
     }
 
     private void Start() {
@@ -58,8 +65,7 @@ public class Player : NetworkBehaviour, IKitchenObjectParent {
 
         if (!IsOwner) return;
 
-        HandleMovementServerAuth();
-        //HandleMovement();
+        HandleMovement();
         HandleInteractions();
     }
 
@@ -92,15 +98,14 @@ public class Player : NetworkBehaviour, IKitchenObjectParent {
         }
     }
 
-    private void HandleMovementServerAuth()
+    public NetworkObject GetNetworkObject()
     {
-        Vector2 inputVector = GameInput.Instance.GetMovementVectorNormalized();
-        HandleMovementServerRpc(inputVector);
+        return NetworkObject;
     }
 
-    [ServerRpc(RequireOwnership = false)]
-    private void HandleMovementServerRpc(Vector2 inputVector)
-    {
+    private void HandleMovement() {
+        Vector2 inputVector = GameInput.Instance.GetMovementVectorNormalized();
+
         Vector3 moveDir = new Vector3(inputVector.x, 0f, inputVector.y);
 
         float moveDistance = moveSpeed * Time.deltaTime;
@@ -152,12 +157,6 @@ public class Player : NetworkBehaviour, IKitchenObjectParent {
         transform.forward = Vector3.Slerp(transform.forward, moveDir, Time.deltaTime * rotateSpeed);
     }
 
-    private void HandleMovement() {
-        Vector2 inputVector = GameInput.Instance.GetMovementVectorNormalized();
-
-        
-    }
-
     private void SetSelectedCounter(BaseCounter selectedCounter) {
         this.selectedCounter = selectedCounter;
 
@@ -175,6 +174,7 @@ public class Player : NetworkBehaviour, IKitchenObjectParent {
 
         if (kitchenObject != null) {
             OnPickedSomething?.Invoke(this, EventArgs.Empty);
+            onAnyPickedSomething?.Invoke(this, EventArgs.Empty);
         }
     }
 
